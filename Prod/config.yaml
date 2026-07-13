@@ -32,6 +32,16 @@ external_components:
     components: [ lp5562 ]
 
 wifi:
+  # Haupt-WLAN eintragen
+  ssid: "BSZ-STUDENT"
+  password: "BSZBIBI!"
+
+  # Fallback-Hotspot für den Notfall
+  ap:
+    ssid: "aw-intern"
+    password: "Enrollment82!"
+
+captive_portal:
 
 
 
