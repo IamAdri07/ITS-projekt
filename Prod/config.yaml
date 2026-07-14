@@ -98,11 +98,11 @@ display:
 mqtt:
   broker: "mqtt.smoking-pilliger.de"
   port: 8883
-  username: "MQTT_BENUTZER_HIER"
-  password: "MQTT_PASSWORT_HIER"
-  topic_prefix: "BSZ/E2FI3/cont01"
+  username: "mqttuser"
+  password: "menthol1234"
+  topic_prefix: "BSZ/E2FI2/cont01"
   on_message:
-    - topic: "BSZ/E2FI3/cont02/env/temp"
+    - topic: "BSZ/E2FI2/cont02/env/temp"
       then:
         - lambda: |-
             const float temp = atof(x.c_str());
@@ -119,7 +119,7 @@ sensor:
       name: "ENV Temperatur"
       on_value:
         - mqtt.publish:
-            topic: "BSZ/E2FI3/cont01/env/temp"
+            topic: "BSZ/E2FI2/cont01/env/temp"
             payload: !lambda |-
               return str_sprintf("%.2f", x);
     humidity:
@@ -127,7 +127,7 @@ sensor:
       name: "ENV Luftfeuchte"
       on_value:
         - mqtt.publish:
-            topic: "BSZ/E2FI3/cont01/env/humidity"
+            topic: "BSZ/E2FI2/cont01/env/humidity"
             payload: !lambda |-
               return str_sprintf("%.2f", x);
 
@@ -140,7 +140,7 @@ sensor:
       name: "ENV Luftdruck"
       on_value:
         - mqtt.publish:
-            topic: "BSZ/E2FI3/cont01/env/pressure"
+            topic: "BSZ/E2FI2/cont01/env/pressure"
             payload: !lambda |-
               return str_sprintf("%.2f", x);
 
@@ -154,10 +154,10 @@ binary_sensor:
       inverted: true
     on_press:
       - mqtt.publish:
-          topic: "BSZ/E2FI3/cont01/button"
+          topic: "BSZ/E2FI2/cont01/button"
           payload: "pressed"
     on_release:
       - mqtt.publish:
-          topic: "BSZ/E2FI3/cont01/button"
+          topic: "BSZ/E2FI2/cont01/button"
           payload: "released"
  
