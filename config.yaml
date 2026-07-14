@@ -102,7 +102,6 @@ mqtt:
   password: "menthol1234"
   skip_cert_cn_check: false
   certificate_authority: |
-    # Hier den vollständigen Inhalt von isrgrootx1.pem einfügen
     -----BEGIN CERTIFICATE-----
     MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
     TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh

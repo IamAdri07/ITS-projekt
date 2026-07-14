@@ -21,6 +21,12 @@ ota:
 wifi:
   ssid: "BSZ-STUDENT"
   password: "BSZBIBI!"
+  manual_ip:
+    static_ip: 10.151.0.104
+    gateway: 10.151.7.254
+    subnet: 255.255.248.0
+    dns1: 1.1.1.1
+    dns2: 8.8.8.8
   ap:
     ssid: "aw-intern"
     password: "Enrollment82!"
