@@ -101,10 +101,6 @@ mqtt:
   username: "MQTT_BENUTZER_HIER"
   password: "MQTT_PASSWORT_HIER"
   topic_prefix: "BSZ/E2FI3/cont01"
-  certificate_authority: |-
-    -----BEGIN CERTIFICATE-----
-    CA_ZERTIFIKAT_HIER_EINFUEGEN
-    -----END CERTIFICATE-----
   on_message:
     - topic: "BSZ/E2FI3/cont02/env/temp"
       then:
