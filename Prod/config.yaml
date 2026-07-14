@@ -1,12 +1,9 @@
-# Sensor Station 1 mit ENV-III
-# mit WLAN BSZ-Schueler
-# sendet an mqtt (test.mosquitto.org),
-# abonniert Temperatur von Station 2
-# Statusanzeige über Display (grün, gelb, rot, Initialisierung blau)
+# Vollstaendige Beispielkonfiguration fuer das ITS-Projekt
+# M5Stack AtomS3R + ENV-III + externer Taster + MQTT (Auth + TLS)
 
 esphome:
-  name: "atoms3r-fisi-unit-01" # Bitte hier Nummer der Gruppe eintragen!
-  friendly_name: "BSZ Sensor Station 01" # Bitte hier Nummer der Gruppe eintragen!
+  name: atoms3r-cont01
+  friendly_name: BSZ CPS Station 01
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -15,75 +12,64 @@ esp32:
     type: arduino
 
 logger:
-  level: DEBUG
-  
-globals:
-  - id: mqtt_temp
-    type: float
-    restore_value: false
-    initial_value: "0.0"
+  level: INFO
 
-# Lädt den Community-Treiber für den I2C-LED-Chip herunter
-external_components:
-  - source:
-      type: git
-      url: https://github.com/ssieb/esphome
-      ref: lp5562
-    components: [ lp5562 ]
+ota:
+  - platform: esphome
+    password: "OTA_PASSWORT_HIER"
 
 wifi:
-  # Haupt-WLAN eintragen
   ssid: "BSZ-STUDENT"
   password: "BSZBIBI!"
-
-  # Fallback-Hotspot für den Notfall
   ap:
     ssid: "aw-intern"
     password: "Enrollment82!"
 
 captive_portal:
 
+globals:
+  - id: partner_temp
+    type: float
+    restore_value: false
+    initial_value: "-1000.0"
 
+external_components:
+  - source:
+      type: git
+      url: https://github.com/ssieb/esphome
+      ref: lp5562
+    components: [lp5562]
 
-# ==========================================
-# I2C BUSSE (INTERN & EXTERN TRENNEN!)
-# ==========================================
 i2c:
-  # 1. Der INTERNE Bus des AtomS3R für das Display-Licht
   - id: i2c_internal
     sda: GPIO45
     scl: GPIO0
     scan: true
 
-  # 2. Der EXTERNE Bus (Grove-Port) für den ENV III Sensor
   - id: i2c_external
-    sda: 2
-    scl: 1
+    sda: GPIO2
+    scl: GPIO1
     scan: true
 
-# Den LP5562-Chip auf den internen Bus registrieren
 lp5562:
   - i2c_id: i2c_internal
 
 output:
   - platform: lp5562
     id: backlight_output
-    channel: 3 
+    channel: 3
 
 light:
   - platform: monochromatic
     output: backlight_output
-    name: "AtomS3R Display Backlight"
     id: atom_backlight
+    name: "AtomS3R Display Backlight"
     restore_mode: ALWAYS_ON
 
 spi:
   clk_pin: GPIO15
   mosi_pin: GPIO21
 
-# ==========================================
-# DISPLAY & MQTT LOGIK
-# ==========================================
 display:
   - platform: st7789v
     id: oled_display
@@ -92,45 +78,90 @@ display:
     height: 128
     offset_width: 2
     offset_height: 1
-    cs_pin: GPIO14  
-    dc_pin: GPIO42  
-    reset_pin: GPIO48 
+    cs_pin: GPIO14
+    dc_pin: GPIO42
+    reset_pin: GPIO48
     rotation: 0
     update_interval: 1s
     lambda: |-
-      // Variable auslesen
-      float temp = id(mqtt_temp);
-      # Hier kommen die Bedingungen und Aktionen hin! ================
-      if (temp == 0.0) {
-        // Startwert, wenn noch keine MQTT-Nachricht da ist
-        it.fill(Color(0, 0, 255)); // BLAU
-      } else if (...) {
-        it.fill(Color(...)); // GRÜN
-      } else if (...) {
-        it.fill(Color(...)); // GELB 
+      const float temp = id(partner_temp);
+      if (temp < -999.0) {
+        it.fill(Color(0, 0, 255));
+      } else if (temp < 25.0) {
+        it.fill(Color(0, 255, 0));
+      } else if (temp <= 28.0) {
+        it.fill(Color(255, 255, 0));
       } else {
-        it.fill(Color(....)); // ROT
+        it.fill(Color(255, 0, 0));
       }
 
 mqtt:
-  broker: "152.53.144.73"
-  port: 1883
-  topic_prefix: "BSZ/E2FI2/Unit-01"  # <===== Bitte hier Nummer der Gruppe eintragen!
+  broker: "mqtt.smoking-pilliger.de"
+  port: 8883
+  username: "MQTT_BENUTZER_HIER"
+  password: "MQTT_PASSWORT_HIER"
+  topic_prefix: "BSZ/E2FI3/cont01"
+  certificate_authority: |-
+    -----BEGIN CERTIFICATE-----
+    CA_ZERTIFIKAT_HIER_EINFUEGEN
+    -----END CERTIFICATE-----
   on_message:
-     # Bitte hier Nummer bzw. Topic der PARTNER-Gruppe eintragen!
-    - topic: "BSZ/E2FI2/Unit-01/sensor/raumtemperatur/state"
+    - topic: "BSZ/E2FI3/cont02/env/temp"
       then:
         - lambda: |-
-            // Wert aus MQTT empfangen, konvertieren und in Globale Variable schreiben
-            float temp = atof(x.c_str());
-            id(mqtt_temp) = temp;
-            ESP_LOGI("mqtt", "Empfangene Temperatur: %.2f °C", temp);
+            const float temp = atof(x.c_str());
+            id(partner_temp) = temp;
+            ESP_LOGI("mqtt", "Partner-Temperatur empfangen: %.2f", temp);
 
-# ==========================================
-# SENSOREN
-# ==========================================
 sensor:
+  - platform: sht3xd
+    i2c_id: i2c_external
+    address: 0x44
+    update_interval: 20s
+    temperature:
+      id: env_temp
+      name: "ENV Temperatur"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI3/cont01/env/temp"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
+    humidity:
+      id: env_humidity
+      name: "ENV Luftfeuchte"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI3/cont01/env/humidity"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
 
+  - platform: qmp6988
+    i2c_id: i2c_external
+    address: 0x70
+    update_interval: 20s
+    pressure:
+      id: env_pressure
+      name: "ENV Luftdruck"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI3/cont01/env/pressure"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
 
 binary_sensor:
+  - platform: gpio
+    id: external_button
+    name: "Externer Taster"
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    on_press:
+      - mqtt.publish:
+          topic: "BSZ/E2FI3/cont01/button"
+          payload: "pressed"
+    on_release:
+      - mqtt.publish:
+          topic: "BSZ/E2FI3/cont01/button"
+          payload: "released"
  
