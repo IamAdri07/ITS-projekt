@@ -1,0 +1,165 @@
+# Vollstaendige Beispielkonfiguration fuer das ITS-Projekt
+# M5Stack AtomS3R + ENV-III + externer Taster + MQTT (Auth + TLS)
+
+esphome:
+  name: atoms3r-cont01
+  friendly_name: BSZ CPS Station 01
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+ota:
+  - platform: esphome
+    password: "verysecurepassword"
+
+wifi:
+  ssid: "BSZ-STUDENT"
+  password: "BSZBIBI!"
+  ap:
+    ssid: "aw-intern"
+    password: "Enrollment82!"
+
+captive_portal:
+
+globals:
+  - id: partner_temp
+    type: float
+    restore_value: false
+    initial_value: "-1000.0"
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/ssieb/esphome
+      ref: lp5562
+    components: [lp5562]
+
+i2c:
+  - id: i2c_internal
+    sda: GPIO45
+    scl: GPIO0
+    scan: true
+
+  - id: i2c_external
+    sda: GPIO2
+    scl: GPIO1
+    scan: true
+
+lp5562:
+  - i2c_id: i2c_internal
+
+output:
+  - platform: lp5562
+    id: backlight_output
+    channel: 3
+
+light:
+  - platform: monochromatic
+    output: backlight_output
+    id: atom_backlight
+    name: "AtomS3R Display Backlight"
+    restore_mode: ALWAYS_ON
+
+spi:
+  clk_pin: GPIO15
+  mosi_pin: GPIO21
+
+display:
+  - platform: st7789v
+    id: oled_display
+    model: CUSTOM
+    width: 128
+    height: 128
+    offset_width: 2
+    offset_height: 1
+    cs_pin: GPIO14
+    dc_pin: GPIO42
+    reset_pin: GPIO48
+    rotation: 0
+    update_interval: 1s
+    lambda: |-
+      const float temp = id(partner_temp);
+      if (temp < -999.0) {
+        it.fill(Color(0, 0, 255));
+      } else if (temp < 25.0) {
+        it.fill(Color(0, 255, 0));
+      } else if (temp <= 28.0) {
+        it.fill(Color(255, 255, 0));
+      } else {
+        it.fill(Color(255, 0, 0));
+      }
+
+mqtt:
+  broker: "mqtt.smoking-pilliger.de"
+  port: 8883
+  username: "mqttuser"
+  password: "menthol1234"
+  topic_prefix: "BSZ/E2FI2/cont01"
+  on_message:
+    - topic: "BSZ/E2FI2/cont02/env/temp"
+      then:
+        - lambda: |-
+            const float temp = atof(x.c_str());
+            id(partner_temp) = temp;
+            ESP_LOGI("mqtt", "Partner-Temperatur empfangen: %.2f", temp);
+
+sensor:
+  - platform: sht3xd
+    i2c_id: i2c_external
+    address: 0x44
+    update_interval: 20s
+    temperature:
+      id: env_temp
+      name: "ENV Temperatur"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI2/cont01/env/temp"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
+    humidity:
+      id: env_humidity
+      name: "ENV Luftfeuchte"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI2/cont01/env/humidity"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
+
+  - platform: qmp6988
+    i2c_id: i2c_external
+    address: 0x70
+    update_interval: 20s
+    pressure:
+      id: env_pressure
+      name: "ENV Luftdruck"
+      on_value:
+        - mqtt.publish:
+            topic: "BSZ/E2FI2/cont01/env/pressure"
+            payload: !lambda |-
+              return str_sprintf("%.2f", x);
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: 5
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Taster Status"
+    id: button_g5
+    on_state:
+      then:
+        - mqtt.publish:
+            topic: "BSZ/E2FI2/Unit-01/Taster" # Unit-Nummer anpassen!
+            payload: !lambda |-
+              if (x) {
+                return "Taster: 1"; 
+              } else {
+                return "Taster: 0"; 
+              }
+ 
